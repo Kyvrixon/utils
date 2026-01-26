@@ -36,7 +36,7 @@ export class Logger {
 		const now = new Date();
 		const ms = now.getMilliseconds().toString().padStart(3, "0");
 		const base = formatter.format(now).replace(",", " @");
-		return `${base}:${ms}`;
+		return `${base}.${ms}`;
 	}
 
 	private formatMessage(level: LogLevel, message: string | Error): string {

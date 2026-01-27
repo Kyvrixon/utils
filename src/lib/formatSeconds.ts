@@ -25,7 +25,14 @@ const ALL_UNITS_ORDER: Array<TimeUnitTypes> = [
 	"ms",
 ];
 
-export const formatSeconds = (
+/**
+ * Format a number to a customisable and readable time string
+ * 
+ * @param seconds Number in seconds to format
+ * @param options Options for formatting
+ * @returns string
+ */
+export function formatSeconds(
 	seconds: number,
 	options: {
 		includeZeroUnits?: boolean;
@@ -37,7 +44,7 @@ export const formatSeconds = (
 			label: string,
 		) => string;
 	} = {},
-): string => {
+): string {
 	const includeZeroUnits = options.includeZeroUnits ?? false;
 	const onlyUnits = options.onlyUnits ?? [];
 	const format = options.format ?? "long";
@@ -132,4 +139,4 @@ export const formatSeconds = (
 	}
 
 	return parts.join(format === "short" ? " " : ",");
-};
+}

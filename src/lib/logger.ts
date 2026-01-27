@@ -81,7 +81,7 @@ export class Logger {
 
 	/**
 	 * Pring a regular (info) message
-	 * 
+	 *
 	 * @param m Message to display
 	 */
 	public notif(m: unknown) {
@@ -90,7 +90,7 @@ export class Logger {
 
 	/**
 	 * Print an alert (warning)
-	 * 
+	 *
 	 * @param m Message to display
 	 */
 	public alert(m: unknown) {
@@ -99,7 +99,7 @@ export class Logger {
 
 	/**
 	 * Print an error
-	 * 
+	 *
 	 * @param m Message to display
 	 * @param e Error (optional)
 	 * @param f Force error - directly calls `console.error()`
@@ -110,7 +110,7 @@ export class Logger {
 
 	/**
 	 * Print a debug message
-	 * 
+	 *
 	 * @param m Message to display
 	 */
 	public debug(m: unknown) {

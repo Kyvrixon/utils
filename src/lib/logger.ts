@@ -12,7 +12,7 @@ const formatter = new Intl.DateTimeFormat("en-AU", {
 });
 
 /**
- * To enable debuging make the env variable `__DEBUG_MODE` equal to "1"
+ * Console logger
  */
 export class Logger {
 	private readonly colors: Record<LogLevel, typeof chalk> = {
@@ -60,6 +60,7 @@ export class Logger {
 				return (
 					line
 						.trim()
+						// TODO Need to do something with this
 						// .replace(/\\/g, "/")
 						// .replace(
 						// 	/(.*):(\d+):(\d+)/,
@@ -114,7 +115,7 @@ export class Logger {
 	 * @param m Message to display
 	 */
 	public debug(m: unknown) {
-		if ("__DEBUG_MODE" in env && env.__DEBUG_MODE === "1") this.log("debug", m);
+		this.log("debug", m);
 	}
 
 	public divider(text: string): void {

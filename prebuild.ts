@@ -17,7 +17,7 @@ await Bun.write(
 	`
 # @kyvrixon/utils
 
-General utility files I use for alot of projects! Designed for use with [bun runtime](https://bun.sh/)!
+General utility files I use for alot of projects! Designed for use with the [bun runtime](https://bun.sh/)!
 
 \`\`\`bash
 bun install @kyvrixon/utils

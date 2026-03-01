@@ -1,16 +1,14 @@
-const suffixes: Record<string, string> = {
+const pr = new Intl.PluralRules("en-US", { type: "ordinal" });
+const suffixes: Record<Intl.LDMLPluralRule, string> = {
 	one: "st",
 	two: "nd",
 	few: "rd",
 	other: "th",
+	// Included for type safety
+	zero: "th",
+	many: "th",
 };
 
-/**
- * Converts a number to its ordinal value
- * 
- * @param n Number to convert
- * @returns string
- */
 export function toOrdinal(n: number): string {
-	return `${n}${suffixes[new Intl.PluralRules("en-US", { type: "ordinal" }).select(n)]}`;
+	return `${n}${suffixes[pr.select(n)]}`;
 }

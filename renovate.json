@@ -3,7 +3,6 @@
 	"extends": ["config:recommended"],
 	"labels": [],
 	"prFooter": "",
-	"prBodyTemplate": "{{{header}}}{{{table}}}{{{warnings}}}{{{notes}}}{{{changelogs}}}{{{controls}}}",
 	"packageRules": [
 		{
 			"schedule": ["at any time"],

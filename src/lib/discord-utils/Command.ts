@@ -7,24 +7,24 @@ import type {
 	SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
-export class DiscordCommand<C extends Client<boolean>> {
+export class DiscordCommand<C extends Client<boolean> = Client<boolean>> {
 	public readonly data:
 		| SlashCommandBuilder
 		| SlashCommandOptionsOnlyBuilder
 		| SlashCommandSubcommandsOnlyBuilder;
-	public readonly execute: <T>(
+	public readonly execute: (
 		client: C,
 		interaction: ChatInputCommandInteraction,
-	) => Promise<T>;
-	public readonly autocomplete: <T>(
+	) => Promise<void>;
+	public readonly autocomplete?: (
 		client: C,
 		interaction: AutocompleteInteraction,
-	) => Promise<T>;
+	) => Promise<void>;
 
 	constructor(ops: {
 		data: DiscordCommand<C>["data"];
 		execute: DiscordCommand<C>["execute"];
-		autocomplete: DiscordCommand<C>["autocomplete"];
+		autocomplete?: DiscordCommand<C>["autocomplete"];
 	}) {
 		this.data = ops.data;
 		this.execute = ops.execute;

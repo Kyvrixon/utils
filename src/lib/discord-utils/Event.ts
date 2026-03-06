@@ -1,17 +1,29 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: it's fine */
+/** biome-ignore-all lint/suspicious/noExplicitAny: Its fine */
 import type { Client, ClientEvents, RestEvents } from "discord.js";
 
-type EventType = "client" | "rest" | "custom";
-type DefaultTyping = { "You forgot to pass in your types to the class!": [] };
-
+// biome-ignore lint/suspicious/noEmptyInterface: Its fine
+export interface DiscordEventCustomType {}
+/**
+ * To define custom types:
+ * @example
+declare module "@kyvrixon/utils" {
+	interface DiscordEventCustomType {
+		myEventName: [data: string]
+	}
+}
+ */
 export class DiscordEvent<
-	V extends Client = Client,
-	C extends Record<string, any[]> = DefaultTyping,
-	T extends EventType = "custom",
-	K extends
-		| keyof C
-		| keyof ClientEvents
-		| keyof RestEvents = keyof DefaultTyping,
+	V extends Client,
+	T extends "client" | "custom" | "rest" = "client",
+	K extends T extends "custom"
+		? keyof DiscordEventCustomType
+		: T extends "client"
+			? keyof ClientEvents
+			: keyof RestEvents = T extends "custom"
+		? keyof DiscordEventCustomType
+		: T extends "client"
+			? keyof ClientEvents
+			: keyof RestEvents,
 > {
 	public readonly type: T;
 	public readonly name: K;
@@ -26,20 +38,20 @@ export class DiscordEvent<
 				? K extends keyof RestEvents
 					? RestEvents[K]
 					: any[]
-				: K extends keyof C
-					? C[K]
+				: K extends keyof DiscordEventCustomType
+					? DiscordEventCustomType[K]
 					: any[]
 	) => Promise<void>;
 
-	constructor(ops: {
+	constructor(opts: {
 		type: T;
 		name: K;
-		once: boolean;
-		method: DiscordEvent<V, C, T, K>["method"];
+		once?: boolean;
+		method: DiscordEvent<V, T, K>["method"];
 	}) {
-		this.type = ops.type;
-		this.name = ops.name;
-		this.once = ops.once;
-		this.method = ops.method;
+		this.type = opts.type;
+		this.name = opts.name;
+		this.once = opts.once ?? false;
+		this.method = opts.method;
 	}
 }

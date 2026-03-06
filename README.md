@@ -5,8 +5,5 @@ General utility files I use for alot of projects! Designed for use with the [bun
 ```bash
 bun install @kyvrixon/utils
 # or
-bun install github:kyvrixon/utils#1.0.0
-
-# if you want the absolute latest changes (unstable)
-bun install github:kyvrixon/utils#main
+bun install github:kyvrixon/utils#1.0.5
 ```

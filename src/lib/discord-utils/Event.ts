@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: it's fine */
 import type { Client, ClientEvents, RestEvents } from "discord.js";
 
 type EventType = "client" | "rest" | "custom";
@@ -17,12 +18,12 @@ export class DiscordEvent<
 		...args: T extends "client"
 			? K extends keyof ClientEvents
 				? ClientEvents[K]
-				: unknown[]
+				: any[]
 			: T extends "rest"
 				? K extends keyof RestEvents
 					? RestEvents[K]
-					: unknown[]
-				: unknown[]
+					: any[]
+				: any[]
 	) => Promise<void>;
 
 	constructor(ops: {

@@ -23,9 +23,6 @@ General utility files I use for alot of projects! Designed for use with the [bun
 bun install @kyvrixon/utils
 # or
 bun install github:kyvrixon/utils#${version}
-
-# if you want the absolute latest changes (unstable)
-bun install github:kyvrixon/utils#main
 \`\`\`
 `.trim(),
 );

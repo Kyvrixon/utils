@@ -7,7 +7,7 @@ import type {
 	SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
-export class DiscordCommand<C extends Client<boolean> = Client<boolean>> {
+export class DiscordCommand<C extends Client<boolean>> {
 	public readonly data:
 		| SlashCommandBuilder
 		| SlashCommandOptionsOnlyBuilder

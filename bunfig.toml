@@ -1,2 +1,6 @@
 [install.scopes]
 "@kyvrixon" = { url = "https://npm.pkg.github.com", token = "$GITHUB_TOKEN" }
+
+[install]
+exact = true
+lockfile = { save = true }

@@ -4,7 +4,6 @@ description: "Run bun tests"
 
 on:
   push:
-  pull_request:
 
 jobs:
   test:

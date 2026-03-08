@@ -6,11 +6,15 @@ export interface DiscordEventCustomType {}
 /**
  * To define custom types:
  * @example
-declare module "@kyvrixon/utils" {
-	interface DiscordEventCustomType {
-		myEventName: [data: string]
-	}
-}
+ * declare module "@kyvrixon/utils" {
+ * 	interface DiscordEventCustomType {
+ *			myEventName: [data: string];
+ *		}
+ * }
+ * // You can also add these to `ClientEvents` if you wish for better typing like so:
+ * declare module "discord.js" {
+ * 	interface ClientEvents extends DiscordEventCustomType {}
+ * }
  */
 export class DiscordEvent<
 	V extends Client,

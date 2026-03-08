@@ -90,11 +90,7 @@ export function formatSeconds(
 	const parts: string[] = [];
 	for (const unit of unitsToDisplay) {
 		const value = diff[unit] ?? 0;
-		if (
-			value > 0 ||
-			includeZeroUnits ||
-			(onlyUnits.length > 0 && unitsToDisplay.includes(unit))
-		) {
+		if (value > 0 || includeZeroUnits) {
 			const label =
 				format === "short"
 					? UNITS[unit].short

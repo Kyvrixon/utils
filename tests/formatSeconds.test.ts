@@ -50,3 +50,21 @@ test("handles zero seconds input", () => {
 test("handles large durations (years)", () => {
 	expect(formatSeconds(31536000)).toContain("1 year");
 });
+
+test("onlyUnits with zero values does not show zeros when includeZeroUnits is false", () => {
+	const result = formatSeconds(3600, {
+		includeZeroUnits: false,
+		onlyUnits: ["d", "h", "m", "s"],
+		format: "long",
+	});
+	expect(result).toBe("1 hour");
+});
+
+test("onlyUnits with zero values shows zeros when includeZeroUnits is true", () => {
+	const result = formatSeconds(3600, {
+		includeZeroUnits: true,
+		onlyUnits: ["d", "h", "m", "s"],
+		format: "long",
+	});
+	expect(result).toBe("0 days, 1 hour, 0 minutes and 0 seconds");
+});

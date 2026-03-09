@@ -1,7 +1,7 @@
 {
 	"name": "@kyvrixon/utils",
 	"main": "./src/index.ts",
-	"version": "1.0.7",
+	"version": "1.0.9",
 	"type": "module",
 	"private": false,
 	"license": "MIT",

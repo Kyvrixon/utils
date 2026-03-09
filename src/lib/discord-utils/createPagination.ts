@@ -1,3 +1,4 @@
+import { randomUUIDv7 } from "bun";
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -11,7 +12,6 @@ import {
 	LabelBuilder,
 	type MediaGalleryBuilder,
 	type MentionableSelectMenuBuilder,
-	MessageFlags,
 	ModalBuilder,
 	type RoleSelectMenuBuilder,
 	type SectionBuilder,
@@ -22,7 +22,6 @@ import {
 	TextInputStyle,
 	type UserSelectMenuBuilder,
 } from "discord.js";
-import { randomUUIDv7 } from "bun";
 
 export type MessageActionRow = ActionRowBuilder<
 	| ButtonBuilder
@@ -317,8 +316,8 @@ export async function createPagination(
 						flags: ["Ephemeral"],
 						allowedMentions: {
 							parse: [],
-							repliedUser: false
-						}
+							repliedUser: false,
+						},
 					})
 					.catch(() => null);
 				return;

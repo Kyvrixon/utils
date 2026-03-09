@@ -5,5 +5,5 @@ General utility files I use for alot of projects! Designed for use with the [bun
 ```bash
 bun install @kyvrixon/utils
 # or
-bun install github:kyvrixon/utils#1.0.7
+bun install github:kyvrixon/utils#1.0.9
 ```

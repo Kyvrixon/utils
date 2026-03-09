@@ -42,22 +42,10 @@ export type LeaderboardComponentType =
 	| { type: "actionrow"; component: MessageActionRow };
 
 export interface LeaderboardOptions {
-	/**
-	 * @default "--DATA_INPUT--"
-	 */
 	contentMarker?: string;
-	/**
-	 * @default 5
-	 */
 	entriesPerPage?: number;
-	/**
-	 * @default {}
-	 */
 	replacements?: Record<string, string>;
 	styling?: Array<{ accent_color?: number; spoiler?: boolean }>;
-	/**
-	 * @default false
-	 */
 	ephemeral?: boolean;
 }
 
@@ -73,7 +61,7 @@ function applyReplacements(
 }
 
 function getPaginationRow(
-	uID: string,
+	prefix: string,
 	currentIndex: number,
 	entriesPerPage: number,
 	totalPages: number,
@@ -82,28 +70,25 @@ function getPaginationRow(
 ): ActionRowBuilder<ButtonBuilder> {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
-			.setCustomId(`~PAGINATON_${uID}_back_button`)
+			.setCustomId(`${prefix}back`)
 			.setLabel("Prev")
 			.setStyle(ButtonStyle.Secondary)
 			.setDisabled(ended || currentIndex === 0),
 		new ButtonBuilder()
-			.setCustomId(`~PAGINATON_${uID}_page_info`)
+			.setCustomId(`${prefix}info`)
 			.setLabel(
 				`${Math.floor(currentIndex / entriesPerPage) + 1}/${totalPages}`,
 			)
 			.setStyle(ButtonStyle.Secondary)
 			.setDisabled(ended || totalPages === 1),
 		new ButtonBuilder()
-			.setCustomId(`~PAGINATON_${uID}_forward_button`)
+			.setCustomId(`${prefix}forward`)
 			.setLabel("Next")
 			.setStyle(ButtonStyle.Secondary)
 			.setDisabled(ended || currentIndex + entriesPerPage >= listLength),
 	);
 }
 
-/**
- * If you need to filter out button interactions from this, all `customId` fields start with `~PAGINATON_`
- */
 export async function createPagination(
 	list: Array<string>,
 	structure: Array<Array<LeaderboardComponentType>>,
@@ -122,6 +107,7 @@ export async function createPagination(
 		throw new Error("entriesPerPage must be greater than 0");
 
 	const uID = randomUUIDv7();
+	const prefix = `~PAGINATION_${uID}_`;
 	let currentIndex = 0;
 	let ended = false;
 
@@ -144,9 +130,10 @@ export async function createPagination(
 	}
 
 	const totalPages = Math.ceil(list.length / entriesPerPage);
-
 	const lastPage = structure[structure.length - 1];
+
 	if (!lastPage) throw new Error("createLeaderboard is in a corrupted state");
+
 	while (structure.length < totalPages) {
 		structure.push(
 			lastPage.map((comp) => {
@@ -170,7 +157,7 @@ export async function createPagination(
 				switch (comp.type) {
 					case "buttons":
 						return getPaginationRow(
-							uID,
+							prefix,
 							currentIndex,
 							entriesPerPage,
 							totalPages,
@@ -255,40 +242,36 @@ export async function createPagination(
 	});
 
 	collector.on("collect", async (btn) => {
-		const buttonIds = [
-			`~PAGINATON_${uID}_back_button`,
-			`~PAGINATON_${uID}_page_info`,
-			`~PAGINATON_${uID}_forward_button`,
-		];
-
-		if (!buttonIds.includes(btn.customId)) return;
 		if (btn.user.id !== interaction.user.id) {
 			return void btn.deferUpdate();
 		}
 
+		if (!btn.customId.startsWith(prefix)) return;
+
 		ended = false;
 		collector.resetTimer();
 
-		if (btn.customId === `~PAGINATON_${uID}_page_info`) {
+		if (btn.customId === `${prefix}info`) {
 			const modal = new ModalBuilder()
-				.setCustomId(`~PAGINATON_${uID}_page_modal`)
+				.setCustomId(`${prefix}modal`)
 				.setTitle("Page Indexer")
 				.addLabelComponents(
 					new LabelBuilder()
-						.setDescription("Input a page number")
+						// .setDescription("Input a page number")
+						.setLabel("Input a page number")
 						.setTextInputComponent(
 							new TextInputBuilder()
-								.setCustomId(`~PAGINATON_${uID}_page_number`)
+								.setCustomId(`${prefix}number`)
 								.setRequired(true)
 								.setMinLength(1)
 								.setStyle(TextInputStyle.Short),
 						),
 				);
 
-			await btn.showModal(modal).catch(() => {});
+			await btn.showModal(modal).catch((e) => console.error(e));
 			const modalSubmit = await btn
 				.awaitModalSubmit({ time: 60_000 })
-				.catch(() => null);
+				.catch((e) => console.error(e));
 
 			if (!modalSubmit) {
 				await btn
@@ -302,7 +285,7 @@ export async function createPagination(
 
 			await modalSubmit.deferUpdate().catch(() => null);
 			const pageNumber = Number(
-				modalSubmit.fields.getTextInputValue(`~PAGINATON_${uID}_page_number`),
+				modalSubmit.fields.getTextInputValue(`${prefix}number`),
 			);
 
 			if (
@@ -326,9 +309,7 @@ export async function createPagination(
 			currentIndex = (pageNumber - 1) * entriesPerPage;
 		} else {
 			currentIndex +=
-				btn.customId === `~PAGINATON_${uID}_back_button`
-					? -entriesPerPage
-					: entriesPerPage;
+				btn.customId === `${prefix}back` ? -entriesPerPage : entriesPerPage;
 			currentIndex = Math.max(
 				0,
 				Math.min(currentIndex, (totalPages - 1) * entriesPerPage),
@@ -344,38 +325,3 @@ export async function createPagination(
 		await render();
 	});
 }
-
-/*
-##############################	
-#          example           #
-##############################	
-	await createLeaderboard(
-		Array.from({ length: 100 }, (_, i) => String(i + 1)),
-		[
-			[
-				{
-					type: "display",
-					component: new TextDisplayBuilder().setContent("Numberssssss"),
-				},
-				{
-					type: "separator",
-					component: new SeparatorBuilder()
-						.setDivider(true)
-						.setSpacing(SeparatorSpacingSize.Small),
-				},
-				{
-					component: new TextDisplayBuilder().setContent("--DATA_INPUT--"),
-					type: "display",
-				},
-				{
-					type: "buttons",
-				},
-			],
-		],
-		int,
-		{
-			entriesPerPage: 10,
-			ephemeral: false,
-		},
-	);
-*/

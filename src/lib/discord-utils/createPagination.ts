@@ -1,3 +1,4 @@
+import { randomUUIDv7 } from "bun";
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -11,7 +12,6 @@ import {
 	LabelBuilder,
 	type MediaGalleryBuilder,
 	type MentionableSelectMenuBuilder,
-	MessageFlags,
 	ModalBuilder,
 	type RoleSelectMenuBuilder,
 	type SectionBuilder,
@@ -22,7 +22,6 @@ import {
 	TextInputStyle,
 	type UserSelectMenuBuilder,
 } from "discord.js";
-import { randomUUIDv7 } from "bun";
 
 export type MessageActionRow = ActionRowBuilder<
 	| ButtonBuilder
@@ -128,7 +127,11 @@ export async function createPagination(
 
 	if (!list.length) {
 		await interaction
-			.followUp({
+			.reply({
+				allowedMentions: {
+					parse: [],
+					repliedUser: false,
+				},
 				components: [
 					new ContainerBuilder().addTextDisplayComponents(
 						new TextDisplayBuilder().setContent("No data to show"),
@@ -149,7 +152,7 @@ export async function createPagination(
 			lastPage.map((comp) => {
 				if (comp.type === "display") {
 					return {
-						type: "display" as const,
+						type: "display",
 						component: new TextDisplayBuilder(comp.component.toJSON()),
 					};
 				}
@@ -231,6 +234,10 @@ export async function createPagination(
 					generateContainer(Math.floor(currentIndex / entriesPerPage)),
 				],
 				flags: ["IsComponentsV2"],
+				allowedMentions: {
+					parse: [],
+					repliedUser: false,
+				},
 			});
 		} catch (error) {
 			const e = error as Error;
@@ -287,7 +294,7 @@ export async function createPagination(
 				await btn
 					.followUp({
 						content: "Modal timed out.",
-						flags: MessageFlags.Ephemeral,
+						flags: ["Ephemeral"],
 					})
 					.catch(() => null);
 				return;
@@ -307,6 +314,10 @@ export async function createPagination(
 					.reply({
 						content: `Invalid page! Choose a number between **1** and **${totalPages}**.`,
 						flags: ["Ephemeral"],
+						allowedMentions: {
+							parse: [],
+							repliedUser: false,
+						},
 					})
 					.catch(() => null);
 				return;

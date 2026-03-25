@@ -1,7 +1,7 @@
 {
 	"name": "@kyvrixon/utils",
 	"main": "./src/index.ts",
-	"version": "1.0.9",
+	"version": "1.0.11",
 	"type": "module",
 	"private": false,
 	"license": "MIT",
@@ -9,20 +9,20 @@
 		"src"
 	],
 	"engines": {
-		"bun": "1.3.10"
+		"bun": "1.3.11"
 	},
 	"repository": {
 		"url": "https://github.com/kyvrixon/utils"
 	},
 	"scripts": {
-		"pub": "bun prebuild.ts && bun publish --access public",
+		"pub": "bun publish --access public",
 		"pretty": "bun biome format --write ."
 	},
 	"packageManager": "bun@1.3.10",
 	"types": "./src/index.ts",
 	"devDependencies": {
-		"@biomejs/biome": "2.4.7",
-		"@types/bun": "1.3.10",
+		"@biomejs/biome": "2.4.6",
+		"@types/bun": "1.3.11",
 		"typescript": "5.9.3"
 	},
 	"dependencies": {

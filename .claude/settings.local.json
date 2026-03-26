@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/Users/kyvrixon/.bun/bin/bun *)",
+      "Bash(bun test:*)"
+    ]
+  }
+}

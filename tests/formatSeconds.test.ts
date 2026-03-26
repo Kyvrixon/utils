@@ -1,70 +1,184 @@
-import { expect, test } from "bun:test";
-import { formatSeconds } from "../src/index";
+import { describe, expect, test } from "bun:test";
+import { formatSeconds } from "../src";
 
-test("formats basic seconds to long format", () => {
-	expect(formatSeconds(3661)).toBe("1 hour, 1 minute and 1 second");
-});
+describe("formatSeconds", () => {
+	describe("long format (default)", () => {
+		test("single unit", () => {
+			expect(formatSeconds(60)).toBe("1 minute");
+			expect(formatSeconds(3600)).toBe("1 hour");
+			expect(formatSeconds(86400)).toBe("1 day");
+		});
 
-test("formats to short format", () => {
-	expect(formatSeconds(3661, { format: "short" })).toBe("1h 1m 1s");
-});
+		test("pluralizes values > 1", () => {
+			expect(formatSeconds(120)).toBe("2 minutes");
+			expect(formatSeconds(7200)).toBe("2 hours");
+			expect(formatSeconds(172800)).toBe("2 days");
+		});
 
-test("handles pluralization", () => {
-	expect(formatSeconds(7200)).toBe("2 hours");
-});
+		test("joins two parts with 'and'", () => {
+			expect(formatSeconds(3661)).toBe("1 hour, 1 minute and 1 second");
+		});
 
-test("filters units using onlyUnits", () => {
-	const result = formatSeconds(3661, { onlyUnits: ["h", "m"] });
-	expect(result).toBe("1 hour and 1 minute");
-});
-
-test("handles calendar-aware months", () => {
-	// 31 days in seconds (January length)
-	expect(formatSeconds(2678400, { onlyUnits: ["mo", "d"] })).toContain(
-		"1 month",
-	);
-});
-
-test("includes zero units when requested", () => {
-	expect(
-		formatSeconds(60, {
-			includeZeroUnits: true,
-			onlyUnits: ["m", "s"],
-		}),
-	).toBe("1 minute and 0 seconds");
-});
-
-test("applies custom formatter", () => {
-	expect(
-		formatSeconds(60, {
-			customFormatter: (unit, value) => `${value}${unit.toUpperCase()}`,
-		}),
-	).toBe("1M");
-});
-
-test("handles zero seconds input", () => {
-	expect(formatSeconds(0)).toBe("0 seconds");
-	expect(formatSeconds(0, { format: "short" })).toBe("0s");
-});
-
-test("handles large durations (years)", () => {
-	expect(formatSeconds(31536000)).toContain("1 year");
-});
-
-test("onlyUnits with zero values does not show zeros when includeZeroUnits is false", () => {
-	const result = formatSeconds(3600, {
-		includeZeroUnits: false,
-		onlyUnits: ["d", "h", "m", "s"],
-		format: "long",
+		test("joins multiple parts with commas and trailing 'and'", () => {
+			expect(formatSeconds(90061)).toBe("1 day, 1 hour, 1 minute and 1 second");
+		});
 	});
-	expect(result).toBe("1 hour");
-});
 
-test("onlyUnits with zero values shows zeros when includeZeroUnits is true", () => {
-	const result = formatSeconds(3600, {
-		includeZeroUnits: true,
-		onlyUnits: ["d", "h", "m", "s"],
-		format: "long",
+	describe("short format", () => {
+		test("abbreviates units", () => {
+			expect(formatSeconds(3661, { format: "short" })).toBe("1h 1m 1s");
+		});
+
+		test("no spaces between value and unit", () => {
+			expect(formatSeconds(7200, { format: "short" })).toBe("2h");
+		});
+
+		test("zero returns '0s'", () => {
+			expect(formatSeconds(0, { format: "short" })).toBe("0s");
+		});
 	});
-	expect(result).toBe("0 days, 1 hour, 0 minutes and 0 seconds");
+
+	describe("zero / non-finite input", () => {
+		test("zero seconds", () => {
+			expect(formatSeconds(0)).toBe("0 seconds");
+			expect(formatSeconds(0, { format: "short" })).toBe("0s");
+		});
+
+		test("negative input clamps to zero", () => {
+			expect(formatSeconds(-100)).toBe("0 seconds");
+			expect(formatSeconds(-100, { format: "short" })).toBe("0s");
+		});
+
+		test("NaN returns zero fallback", () => {
+			expect(formatSeconds(NaN)).toBe("0 seconds");
+			expect(formatSeconds(NaN, { format: "short" })).toBe("0s");
+		});
+
+		test("Infinity returns zero fallback", () => {
+			expect(formatSeconds(Infinity)).toBe("0 seconds");
+			expect(formatSeconds(-Infinity, { format: "short" })).toBe("0s");
+		});
+	});
+
+	describe("onlyUnits filter", () => {
+		test("restricts output to selected units", () => {
+			expect(formatSeconds(3661, { onlyUnits: ["h", "m"] })).toBe(
+				"1 hour and 1 minute",
+			);
+		});
+
+		test("remainder stays in the smallest allowed unit", () => {
+			expect(formatSeconds(3661, { onlyUnits: ["m"] })).toBe("61 minutes");
+		});
+
+		test("only seconds", () => {
+			expect(formatSeconds(90, { onlyUnits: ["s"] })).toBe("90 seconds");
+		});
+
+		test("only milliseconds", () => {
+			expect(formatSeconds(0.123, { onlyUnits: ["ms"] })).toBe(
+				"123 milliseconds",
+			);
+		});
+
+		test("weeks and days", () => {
+			const sevenDays = 604800;
+			expect(formatSeconds(sevenDays, { onlyUnits: ["w", "d"] })).toBe(
+				"1 week",
+			);
+			expect(
+				formatSeconds(sevenDays + 86400, { onlyUnits: ["w", "d"] }),
+			).toBe("1 week and 1 day");
+		});
+	});
+
+	describe("includeZeroUnits", () => {
+		test("shows zero-valued units when true", () => {
+			expect(
+				formatSeconds(3600, {
+					includeZeroUnits: true,
+					onlyUnits: ["d", "h", "m", "s"],
+				}),
+			).toBe("0 days, 1 hour, 0 minutes and 0 seconds");
+		});
+
+		test("hides zero-valued units when false (default)", () => {
+			expect(
+				formatSeconds(3600, {
+					includeZeroUnits: false,
+					onlyUnits: ["d", "h", "m", "s"],
+				}),
+			).toBe("1 hour");
+		});
+	});
+
+	describe("customFormatter", () => {
+		test("overrides per-unit rendering", () => {
+			expect(
+				formatSeconds(60, {
+					customFormatter: (unit, value) => `${value}${unit.toUpperCase()}`,
+				}),
+			).toBe("1M");
+		});
+
+		test("receives correct label for long format", () => {
+			const calls: Array<{ unit: string; value: number; label: string }> = [];
+			formatSeconds(3661, {
+				onlyUnits: ["h", "m", "s"],
+				customFormatter: (unit, value, label) => {
+					calls.push({ unit, value, label });
+					return `${value} ${label}`;
+				},
+			});
+			expect(calls).toEqual([
+				{ unit: "h", value: 1, label: "hour" },
+				{ unit: "m", value: 1, label: "minute" },
+				{ unit: "s", value: 1, label: "second" },
+			]);
+		});
+
+		test("receives plural label when value > 1", () => {
+			let capturedLabel = "";
+			formatSeconds(7200, {
+				onlyUnits: ["h"],
+				customFormatter: (_unit, _value, label) => {
+					capturedLabel = label;
+					return "";
+				},
+			});
+			expect(capturedLabel).toBe("hours");
+		});
+	});
+
+	describe("calendar-aware units", () => {
+		test("years", () => {
+			expect(formatSeconds(31536000)).toContain("1 year");
+		});
+
+		test("months", () => {
+			expect(
+				formatSeconds(2678400, { onlyUnits: ["mo", "d"] }),
+			).toContain("1 month");
+		});
+
+		test("years and months together", () => {
+			const result = formatSeconds(31536000 + 2678400, {
+				onlyUnits: ["y", "mo", "d"],
+			});
+			expect(result).toContain("1 year");
+			expect(result).toContain("1 month");
+		});
+	});
+
+	describe("fractional seconds", () => {
+		test("sub-second value produces milliseconds", () => {
+			expect(formatSeconds(0.5)).toBe("500 milliseconds");
+		});
+
+		test("mixed seconds and milliseconds", () => {
+			expect(formatSeconds(1.5, { onlyUnits: ["s", "ms"] })).toBe(
+				"1 second and 500 milliseconds",
+			);
+		});
+	});
 });

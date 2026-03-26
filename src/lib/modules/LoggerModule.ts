@@ -10,6 +10,10 @@ const formatter = new Intl.DateTimeFormat("en-AU", {
 	hour12: false,
 });
 
+/**
+ * Chalk-based structured logger with timestamped, color-coded output.
+ * Supports levels: `notif`, `alert`, `error`, `debug`.
+ */
 export class LoggerModule {
 	private readonly colors: Record<LogLevel, typeof chalk> = {
 		notif: cyan,
@@ -37,10 +41,15 @@ export class LoggerModule {
 		const timestamp = gray(`[${this.getTimestamp()}]`);
 		const levelLabel = bold(this.colors[level](level.toUpperCase().padEnd(5)));
 
-		const content =
-			message instanceof Error
-				? `${red(message.message)}\n${this.sanitizeStack(message.stack || "")}`
-				: String(message);
+		let content: string;
+		if (message instanceof Error) {
+			const stack = this.sanitizeStack(message.stack || "");
+			content = stack
+				? `${red(message.message)}\n${stack}`
+				: red(message.message);
+		} else {
+			content = String(message);
+		}
 
 		return `${timestamp} ${levelLabel} ${dim("»")} ${content}`;
 	}
@@ -76,21 +85,32 @@ export class LoggerModule {
 		console[this.logMethods[level]](msg);
 	}
 
+	/** Logs at the `notif` (info) level. If `raw` is true, returns the string instead of printing. */
 	public notif(m: unknown, raw = false) {
 		return this.log("notif", m, raw);
 	}
+	/** Logs at the `alert` (warn) level. If `raw` is true, returns the string instead of printing. */
 	public alert(m: unknown, raw = false) {
 		return this.log("alert", m, raw);
 	}
+	/**
+	 * Logs at the `error` level. Pass an optional `Error` to include its sanitized stack trace.
+	 * If `raw` is true, returns the string instead of printing.
+	 */
 	public error(m: unknown, e?: Error, raw = false) {
 		return this.log("error", e ?? m, raw);
 	}
+	/** Logs at the `debug` level. If `raw` is true, returns the string instead of printing. */
 	public debug(m: unknown, raw = false) {
 		return this.log("debug", m, raw);
 	}
 
+	/** Prints a centered `─` divider line with the given text. */
 	public divider(text: string): void {
-		const line = dim("─".repeat(Math.max(0, (50 - text.length - 2) / 2)));
-		console.log(`\n${line} ${bold(text.trim())} ${line}`);
+		const trimmed = text.trim();
+		const remaining = Math.max(0, 50 - trimmed.length - 2);
+		const left = dim("─".repeat(Math.ceil(remaining / 2)));
+		const right = dim("─".repeat(Math.floor(remaining / 2)));
+		console.log(`\n${left} ${bold(trimmed)} ${right}`);
 	}
 }

@@ -25,6 +25,16 @@ const ALL_UNITS_ORDER: Array<TimeUnitTypes> = [
 	"ms",
 ];
 
+/**
+ * Calendar-aware duration formatter. Converts raw seconds into a human-readable string.
+ * @param seconds - The duration in seconds to format.
+ * @param options - Formatting options.
+ * @param options.format - `"long"` (default) for full words, `"short"` for abbreviated units.
+ * @param options.onlyUnits - Restrict output to specific time units.
+ * @param options.includeZeroUnits - Include units with a value of zero.
+ * @param options.customFormatter - Override per-unit rendering.
+ * @returns A formatted duration string (e.g. `"2 hours and 30 minutes"` or `"2h 30m"`).
+ */
 export function formatSeconds(
 	seconds: number,
 	options: {
@@ -44,10 +54,13 @@ export function formatSeconds(
 		format = "long",
 		customFormatter,
 	} = options;
+
+	if (!Number.isFinite(seconds)) return format === "short" ? "0s" : "0 seconds";
+
 	let totalMs = Math.max(0, Math.round(seconds * 1000));
-	const unitsToDisplay = ALL_UNITS_ORDER.filter((u) =>
-		onlyUnits.length ? onlyUnits.includes(u) : true,
-	);
+	const unitsToDisplay = onlyUnits.length
+		? ALL_UNITS_ORDER.filter((u) => onlyUnits.includes(u))
+		: ALL_UNITS_ORDER;
 
 	const diff: Partial<Record<TimeUnitTypes, number>> = {};
 	const now = new Date();
@@ -55,28 +68,29 @@ export function formatSeconds(
 
 	if (unitsToDisplay.includes("y")) {
 		let y = end.getFullYear() - now.getFullYear();
-		const tempDate = new Date(now);
-		tempDate.setFullYear(now.getFullYear() + y);
-		if (tempDate > end) y--;
-		diff.y = y;
-		totalMs -= new Date(now).setFullYear(now.getFullYear() + y) - now.getTime();
+		const afterYears = new Date(now);
+		afterYears.setFullYear(now.getFullYear() + y);
+		if (afterYears > end) y--;
+		diff.y = Math.max(0, y);
+		totalMs -=
+			new Date(now).setFullYear(now.getFullYear() + diff.y) - now.getTime();
 	}
 
 	if (unitsToDisplay.includes("mo")) {
 		const startTotalMonths = now.getFullYear() * 12 + now.getMonth();
 		const endTotalMonths = end.getFullYear() * 12 + end.getMonth();
 		let mo = endTotalMonths - startTotalMonths;
-		if (diff.y) mo -= diff.y * 12;
+		if (diff.y !== undefined) mo -= diff.y * 12;
 
-		const tempDate = new Date(now);
-		tempDate.setFullYear(now.getFullYear() + (diff.y || 0));
-		tempDate.setMonth(now.getMonth() + mo);
-		if (tempDate > end) mo--;
+		const afterYearsAndMonths = new Date(now);
+		afterYearsAndMonths.setFullYear(now.getFullYear() + (diff.y ?? 0));
+		afterYearsAndMonths.setMonth(now.getMonth() + mo);
+		if (afterYearsAndMonths > end) mo--;
 
 		diff.mo = Math.max(0, mo);
 		const jumpDate = new Date(now);
-		jumpDate.setFullYear(now.getFullYear() + (diff.y || 0));
-		jumpDate.setMonth(now.getMonth() + (diff.mo || 0));
+		jumpDate.setFullYear(now.getFullYear() + (diff.y ?? 0));
+		jumpDate.setMonth(now.getMonth() + diff.mo);
 		totalMs = end.getTime() - jumpDate.getTime();
 	}
 

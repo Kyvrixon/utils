@@ -1,6 +1,15 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Its fine */
 import type { Client, ClientEvents, RestEvents } from "discord.js";
 
+/**
+ * Augment this interface via module declaration to register custom event types.
+ * @example
+ * declare module "@kyvrixon/utils" {
+ *   interface DiscordEventCustomType {
+ *     myEvent: [data: string];
+ *   }
+ * }
+ */
 // biome-ignore lint/suspicious/noEmptyInterface: Its fine
 export interface DiscordEventCustomType {}
 
@@ -20,13 +29,10 @@ type EventArgs<
 > = Extract<EventMap<T>[K], any[]>;
 
 /**
- * To define custom types:
- * @example
- * declare module "@kyvrixon/utils" {
- *   interface DiscordEventCustomType {
- *     myEventName: [data: string];
- *   }
- * }
+ * Wraps a discord.js event handler. Supports `"client"`, `"rest"`, and `"custom"` event types.
+ * @typeParam V - The bot's `Client` type.
+ * @typeParam T - The event source discriminant.
+ * @typeParam K - The event name within the chosen source.
  */
 export class DiscordEvent<
 	V extends Client,

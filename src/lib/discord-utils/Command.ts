@@ -7,6 +7,10 @@ import type {
 	SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
+/**
+ * Wraps a discord.js slash command with typed `execute` and optional `autocomplete` handlers.
+ * @typeParam C - The bot's `Client` type.
+ */
 export class DiscordCommand<C extends Client<boolean>> {
 	public readonly data:
 		| SlashCommandBuilder

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatSeconds } from "../src";
 
-describe("formatSeconds", () => {
+describe(() => {
 	describe("long format (default)", () => {
 		test("single unit", () => {
 			expect(formatSeconds(60)).toBe("1 minute");

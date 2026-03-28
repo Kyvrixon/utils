@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { toOrdinal } from "../src";
 
-describe("toOrdinal", () => {
+describe(() => {
 	describe("basic suffixes", () => {
 		test("1st, 2nd, 3rd", () => {
 			expect(toOrdinal(1)).toBe("1st");

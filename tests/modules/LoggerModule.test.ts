@@ -23,7 +23,7 @@ afterEach(() => {
 	debugSpy.mockRestore();
 });
 
-describe("LoggerModule", () => {
+describe(() => {
 	describe("notif", () => {
 		test("prints to console.log with NOTIF label", () => {
 			logger.notif("hello");

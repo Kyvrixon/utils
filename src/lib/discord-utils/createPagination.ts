@@ -8,10 +8,12 @@ import {
 	type ChatInputCommandInteraction,
 	ComponentType,
 	ContainerBuilder,
+	EmbedBuilder,
 	FileBuilder,
 	LabelBuilder,
 	MediaGalleryBuilder,
 	type MentionableSelectMenuBuilder,
+	type Message,
 	ModalBuilder,
 	type RoleSelectMenuBuilder,
 	SectionBuilder,
@@ -33,8 +35,8 @@ export type MessageActionRow = ActionRowBuilder<
 	| MentionableSelectMenuBuilder
 >;
 
-const BUTTONS_SYMBOL: unique symbol = Symbol("pagination-buttons");
-const DATA_SYMBOL: unique symbol = Symbol("pagination-data");
+export const BUTTONS_SYMBOL: unique symbol = Symbol("pagination-buttons");
+export const DATA_SYMBOL: unique symbol = Symbol("pagination-data");
 
 /** Valid component types that can appear in a pagination page layout. */
 export type PaginationInput =
@@ -58,42 +60,76 @@ type InternalComponent =
 	| { type: "gallery"; component: MediaGalleryBuilder }
 	| { type: "actionrow"; component: MessageActionRow };
 
-export interface PaginationOptions {
+/** Shared options for all pagination modes. */
+export interface PaginationBaseOptions {
 	/** Number of list entries shown per page (default: 5). */
 	entriesPerPage?: number;
 	/** Key-value pairs replaced in rendered content. */
 	replacements?: Record<string, string>;
-	/** Per-page container styling overrides. */
-	styling?: Array<{ accent_color?: number; spoiler?: boolean }>;
 	/** Whether the pagination message is ephemeral. */
 	ephemeral?: boolean;
 }
 
 /**
- * Discord Components V2 paginator. Renders a `ContainerBuilder`-based layout
- * with Prev/Next/page-jump buttons. Collector expires after 60 seconds.
+ * Options for **container** mode (Components V2).
+ * Uses a `ContainerBuilder`-based layout with the `IsComponentsV2` message flag.
+ */
+export interface PaginationContainerOptions extends PaginationBaseOptions {
+	/** Selects container mode. */
+	type: "container";
+	/** Single layout template using sentinels `DiscordPagination.DATA` and `DiscordPagination.BUTTONS`. */
+	layout: PaginationInput[];
+	/** Container accent color. */
+	accentColor?: number;
+	/** Whether the container is a spoiler. */
+	spoiler?: boolean;
+}
+
+/**
+ * Options for **embed** mode.
+ * Uses a standard `EmbedBuilder` with an `ActionRow` for navigation buttons.
+ * The embed's `description` and `footer` are reserved for page data and the page counter.
+ */
+export interface PaginationEmbedOptions extends PaginationBaseOptions {
+	/** Selects embed mode. */
+	type: "embed";
+	/** EmbedBuilder template. Description and footer are overwritten per page. */
+	embed: EmbedBuilder;
+}
+
+/** Discriminated union of all pagination option types. Use the `type` field to select a mode. */
+export type PaginationOptions =
+	| PaginationContainerOptions
+	| PaginationEmbedOptions;
+
+/**
+ * Discord paginator supporting both **Components V2** (`ContainerBuilder`) and
+ * **Embed** (`EmbedBuilder`) modes.
  *
- * Use `DiscordPagination.BUTTONS` and `DiscordPagination.DATA` as sentinel
- * values in the structure array to position the navigation row and list data.
+ * @example Container mode
+ * ```ts
+ * const pagination = new DiscordPagination(entries, {
+ *     type: "container",
+ *     layout: [
+ *         "# Leaderboard",
+ *         new SeparatorBuilder(),
+ *         DiscordPagination.DATA,
+ *         new SeparatorBuilder(),
+ *         DiscordPagination.BUTTONS,
+ *     ],
+ *     entriesPerPage: 5,
+ *     accentColor: 0x5865f2,
+ * });
+ * ```
  *
- * @example
- * const pagination = new DiscordPagination(
- *    entries,
- *    [
- *        [
- *            "# Leaderboard",
- *            new SeparatorBuilder(),
- *            DiscordPagination.DATA,
- *            new SeparatorBuilder(),
- *            DiscordPagination.BUTTONS,
- *        ],
- *    ],
- *    {
- *        entriesPerPage: 5,
- *        ephemeral: false,
- *        styling: [{ accent_color: 0x5865f2 }],
- *    },
- * );
+ * @example Embed mode
+ * ```ts
+ * const pagination = new DiscordPagination(entries, {
+ *     type: "embed",
+ *     embed: new EmbedBuilder().setTitle("Leaderboard").setColor(0x5865f2),
+ *     entriesPerPage: 5,
+ * });
+ * ```
  */
 export class DiscordPagination {
 	/** Sentinel — marks where the pagination buttons should render. */
@@ -102,29 +138,30 @@ export class DiscordPagination {
 	static readonly DATA: typeof DATA_SYMBOL = DATA_SYMBOL;
 
 	private readonly list: string[];
-	private readonly structure: Array<Array<InternalComponent>>;
 	private readonly entriesPerPage: number;
 	private readonly replacements?: Record<string, string>;
-	private readonly styling?: PaginationOptions["styling"];
 	private readonly ephemeral: boolean;
 	private readonly prefix: string;
 	private readonly totalPages: number;
+	private readonly mode: "container" | "embed";
 
+	// Container mode
+	private readonly layout?: InternalComponent[];
+	private readonly accentColor?: number;
+	private readonly spoiler?: boolean;
+
+	// Embed mode
+	private readonly embedTemplate?: EmbedBuilder;
+
+	// Runtime state
 	private currentIndex = 0;
 	private ended = false;
-	private interaction!: ButtonInteraction | ChatInputCommandInteraction;
+	private isMessage = false;
+	private interaction?: ButtonInteraction | ChatInputCommandInteraction;
+	private replyMessage?: Message;
 
-	constructor(
-		list: string[],
-		structure: Array<Array<PaginationInput>>,
-		options: PaginationOptions = {},
-	) {
-		const {
-			entriesPerPage = 5,
-			replacements,
-			styling,
-			ephemeral = false,
-		} = options;
+	constructor(list: string[], options: PaginationOptions) {
+		const { entriesPerPage = 5, replacements, ephemeral = false } = options;
 
 		if (entriesPerPage <= 0)
 			throw new Error("entriesPerPage must be greater than 0");
@@ -132,64 +169,74 @@ export class DiscordPagination {
 		this.list = list;
 		this.entriesPerPage = entriesPerPage;
 		this.replacements = replacements;
-		this.styling = styling;
 		this.ephemeral = ephemeral;
 		this.prefix = `~PAGINATION_${randomUUIDv7()}_`;
 		this.totalPages = Math.ceil(list.length / entriesPerPage);
-		this.structure = this.expandStructure(
-			structure.map((page) => page.map((input) => this.normalize(input))),
-		);
+
+		this.mode = options.type;
+
+		if (options.type === "container") {
+			this.layout = options.layout.map((input) => this.normalize(input));
+			this.accentColor = options.accentColor;
+			this.spoiler = options.spoiler;
+		} else {
+			this.embedTemplate = options.embed;
+		}
 	}
 
 	/**
 	 * Sends the paginated message and starts the button collector.
-	 * @param interaction - The interaction to reply to.
+	 * @param target - The interaction or message to reply to.
 	 */
 	public async send(
-		interaction: ButtonInteraction | ChatInputCommandInteraction,
+		target: ButtonInteraction | ChatInputCommandInteraction | Message,
 	): Promise<void> {
-		this.interaction = interaction;
+		this.isMessage = !("deferReply" in target);
+		const userId = this.isMessage
+			? (target as Message).author.id
+			: (target as ButtonInteraction | ChatInputCommandInteraction).user.id;
 
 		if (!this.list.length) {
-			await interaction
-				.reply({
-					allowedMentions: { parse: [], repliedUser: false },
-					components: [
-						new ContainerBuilder().addTextDisplayComponents(
-							new TextDisplayBuilder().setContent("No data to show"),
-						),
-					],
-					flags: this.ephemeral
-						? ["Ephemeral", "IsComponentsV2"]
-						: ["IsComponentsV2"],
-				})
-				.catch(() => {});
+			await this.sendEmpty(target);
 			return;
 		}
 
-		if (!interaction.replied && !interaction.deferred) {
-			await interaction
-				.deferReply({
-					withResponse: true,
-					flags: this.ephemeral ? ["Ephemeral"] : [],
-				})
-				.catch(() => null);
+		if (this.isMessage) {
+			this.replyMessage = await (target as Message).reply(this.buildPayload());
+		} else {
+			const interaction = target as
+				| ButtonInteraction
+				| ChatInputCommandInteraction;
+			this.interaction = interaction;
+
+			if (!interaction.replied && !interaction.deferred) {
+				const response = await interaction
+					.deferReply({
+						withResponse: true,
+						flags: this.ephemeral ? ["Ephemeral"] : [],
+					})
+					.catch(() => null);
+				this.replyMessage =
+					response?.resource?.message ??
+					(await interaction.fetchReply().catch(() => undefined));
+			} else {
+				this.replyMessage = await interaction
+					.fetchReply()
+					.catch(() => undefined);
+			}
+
+			await this.render();
 		}
 
-		const channel = interaction.channel;
-		if (!channel || !("createMessageComponentCollector" in channel)) {
-			throw new Error("Invalid channel type");
-		}
+		if (!this.replyMessage) return;
 
-		await this.render();
-
-		const collector = channel.createMessageComponentCollector({
+		const collector = this.replyMessage.createMessageComponentCollector({
 			componentType: ComponentType.Button,
-			time: 60000,
+			time: 60_000,
 		});
 
 		collector.on("collect", async (btn) => {
-			if (btn.user.id !== interaction.user.id) {
+			if (btn.user.id !== userId) {
 				return void btn.deferUpdate();
 			}
 			if (!btn.customId.startsWith(this.prefix)) return;
@@ -223,6 +270,66 @@ export class DiscordPagination {
 		});
 	}
 
+	private async sendEmpty(
+		target: ButtonInteraction | ChatInputCommandInteraction | Message,
+	): Promise<void> {
+		if (this.mode === "embed" && !this.embedTemplate)
+			throw new Error(
+				"[@kyvrixon/utils]: Pagination: embedTemplate is in a corrupted state",
+			);
+
+		const allowedMentions = { parse: [] as const, repliedUser: false };
+
+		if (this.isMessage) {
+			const payload =
+				this.mode === "container"
+					? {
+							components: [
+								new ContainerBuilder().addTextDisplayComponents(
+									new TextDisplayBuilder().setContent("No data to show"),
+								),
+							],
+							flags: ["IsComponentsV2"] as const,
+							allowedMentions,
+						}
+					: {
+							embeds: [
+								new EmbedBuilder(this.embedTemplate?.toJSON()).setDescription(
+									"No data to show",
+								),
+							],
+							allowedMentions,
+						};
+			await (target as Message).reply(payload).catch(() => {});
+		} else {
+			const payload =
+				this.mode === "container"
+					? {
+							components: [
+								new ContainerBuilder().addTextDisplayComponents(
+									new TextDisplayBuilder().setContent("No data to show"),
+								),
+							],
+							flags: this.ephemeral
+								? (["Ephemeral", "IsComponentsV2"] as const)
+								: (["IsComponentsV2"] as const),
+							allowedMentions,
+						}
+					: {
+							embeds: [
+								new EmbedBuilder(this.embedTemplate?.toJSON()).setDescription(
+									"No data to show",
+								),
+							],
+							flags: this.ephemeral ? (["Ephemeral"] as const) : ([] as const),
+							allowedMentions,
+						};
+			await (target as ButtonInteraction | ChatInputCommandInteraction)
+				.reply(payload)
+				.catch(() => {});
+		}
+	}
+
 	private normalize(input: PaginationInput): InternalComponent {
 		if (input === BUTTONS_SYMBOL) return { type: "buttons" };
 		if (input === DATA_SYMBOL) return { type: "data" };
@@ -243,27 +350,95 @@ export class DiscordPagination {
 		return { type: "actionrow", component: input };
 	}
 
-	private expandStructure(
-		structure: Array<Array<InternalComponent>>,
-	): Array<Array<InternalComponent>> {
-		const lastPage = structure[structure.length - 1];
-		if (!lastPage) throw new Error("Structure must have at least one page");
-
-		while (structure.length < this.totalPages) {
-			structure.push(this.clonePage(lastPage));
+	private buildPayload() {
+		if (this.mode === "embed") {
+			return {
+				embeds: [this.generateEmbed()],
+				components: [this.getPaginationRow()],
+				allowedMentions: { parse: [] as const, repliedUser: false },
+			};
 		}
 
-		return structure;
+		return {
+			components: [this.generateContainer()],
+			flags: ["IsComponentsV2"] as const,
+			allowedMentions: { parse: [] as const, repliedUser: false },
+		};
 	}
 
-	private clonePage(page: Array<InternalComponent>): Array<InternalComponent> {
-		return page.map((comp) =>
-			comp.type === "display"
-				? {
-						type: "display" as const,
-						component: new TextDisplayBuilder(comp.component.toJSON()),
+	private generateContainer(): ContainerBuilder {
+		if (!this.layout)
+			throw new Error(
+				"[@kyvrixon/utils]: Pagination: layout is in a corrupted state",
+			);
+
+		const page = Math.floor(this.currentIndex / this.entriesPerPage);
+
+		return new ContainerBuilder({
+			components: this.layout.map((comp) => {
+				switch (comp.type) {
+					case "buttons":
+						return this.getPaginationRow().toJSON();
+
+					case "data": {
+						const content = this.list
+							.slice(
+								page * this.entriesPerPage,
+								(page + 1) * this.entriesPerPage,
+							)
+							.join("\n");
+						return new TextDisplayBuilder()
+							.setContent(this.applyReplacements(content))
+							.toJSON();
 					}
-				: comp,
+
+					default:
+						return comp.component.toJSON();
+				}
+			}),
+			accent_color: this.accentColor,
+			spoiler: this.spoiler,
+		});
+	}
+
+	private generateEmbed(): EmbedBuilder {
+		if (!this.embedTemplate)
+			throw new Error(
+				"[@kyvrixon/utils]: Pagination: embedTemplate is in a corrupted state",
+			);
+
+		const page = Math.floor(this.currentIndex / this.entriesPerPage);
+		const content = this.list
+			.slice(page * this.entriesPerPage, (page + 1) * this.entriesPerPage)
+			.join("\n");
+
+		return new EmbedBuilder(this.embedTemplate.toJSON())
+			.setDescription(this.applyReplacements(content))
+			.setFooter({ text: `Page ${page + 1}/${this.totalPages}` });
+	}
+
+	private getPaginationRow(): ActionRowBuilder<ButtonBuilder> {
+		return new ActionRowBuilder<ButtonBuilder>().addComponents(
+			new ButtonBuilder()
+				.setCustomId(`${this.prefix}back`)
+				.setLabel("Prev")
+				.setStyle(ButtonStyle.Secondary)
+				.setDisabled(this.ended || this.currentIndex === 0),
+			new ButtonBuilder()
+				.setCustomId(`${this.prefix}info`)
+				.setLabel(
+					`${Math.floor(this.currentIndex / this.entriesPerPage) + 1}/${this.totalPages}`,
+				)
+				.setStyle(ButtonStyle.Secondary)
+				.setDisabled(this.ended || this.totalPages === 1 || this.isMessage),
+			new ButtonBuilder()
+				.setCustomId(`${this.prefix}forward`)
+				.setLabel("Next")
+				.setStyle(ButtonStyle.Secondary)
+				.setDisabled(
+					this.ended ||
+						this.currentIndex + this.entriesPerPage >= this.list.length,
+				),
 		);
 	}
 
@@ -321,69 +496,6 @@ export class DiscordPagination {
 		this.currentIndex = (pageNumber - 1) * this.entriesPerPage;
 	}
 
-	private generateContainer(page: number): ContainerBuilder {
-		const pageStructure = this.structure[page];
-		if (!pageStructure) throw new Error(`Page ${page} structure not found`);
-
-		return new ContainerBuilder({
-			components: pageStructure.map((comp) => {
-				switch (comp.type) {
-					case "buttons":
-						return this.getPaginationRow().toJSON();
-
-					case "data": {
-						const content = this.list
-							.slice(
-								page * this.entriesPerPage,
-								(page + 1) * this.entriesPerPage,
-							)
-							.join("\n");
-						return new TextDisplayBuilder()
-							.setContent(this.applyReplacements(content))
-							.toJSON();
-					}
-
-					// !! Default clause applies to the below as well
-					// case "display":
-					// case "section":
-					// case "separator":
-					// case "file":
-					// case "gallery":
-					// case "actionrow":
-					default:
-						return comp.component.toJSON();
-				}
-			}),
-			accent_color: this.styling?.[page]?.accent_color,
-			spoiler: this.styling?.[page]?.spoiler,
-		});
-	}
-
-	private getPaginationRow(): ActionRowBuilder<ButtonBuilder> {
-		return new ActionRowBuilder<ButtonBuilder>().addComponents(
-			new ButtonBuilder()
-				.setCustomId(`${this.prefix}back`)
-				.setLabel("Prev")
-				.setStyle(ButtonStyle.Secondary)
-				.setDisabled(this.ended || this.currentIndex === 0),
-			new ButtonBuilder()
-				.setCustomId(`${this.prefix}info`)
-				.setLabel(
-					`${Math.floor(this.currentIndex / this.entriesPerPage) + 1}/${this.totalPages}`,
-				)
-				.setStyle(ButtonStyle.Secondary)
-				.setDisabled(this.ended || this.totalPages === 1),
-			new ButtonBuilder()
-				.setCustomId(`${this.prefix}forward`)
-				.setLabel("Next")
-				.setStyle(ButtonStyle.Secondary)
-				.setDisabled(
-					this.ended ||
-						this.currentIndex + this.entriesPerPage >= this.list.length,
-				),
-		);
-	}
-
 	private applyReplacements(content: string): string {
 		if (!this.replacements) return content;
 		return Object.entries(this.replacements).reduce(
@@ -394,15 +506,13 @@ export class DiscordPagination {
 
 	private async render(): Promise<void> {
 		try {
-			await this.interaction.editReply({
-				components: [
-					this.generateContainer(
-						Math.floor(this.currentIndex / this.entriesPerPage),
-					),
-				],
-				flags: ["IsComponentsV2"],
-				allowedMentions: { parse: [], repliedUser: false },
-			});
+			const payload = this.buildPayload();
+
+			if (this.isMessage && this.replyMessage) {
+				await this.replyMessage.edit(payload);
+			} else if (this.interaction) {
+				await this.interaction.editReply(payload);
+			}
 		} catch (error) {
 			const e = error as Error;
 			if (!e.message.includes("Unknown Message")) {

@@ -7,7 +7,7 @@ A personal TypeScript utility library published to npm as `@kyvrixon/utils`. Des
 - **Package**: `@kyvrixon/utils` (public, MIT)
 - **Runtime**: Bun `1.3.11`
 - **Language**: TypeScript (strict, ESNext, bundler module resolution)
-- **Linter/Formatter**: Biome `2.4.6`
+- **Linter/Formatter**: Biome `2.4.9`
 - **Package manager**: `bun` (exact installs via `bunfig.toml`)
 
 ## Branch Strategy
@@ -34,10 +34,12 @@ src/
     formatSeconds.ts                # calendar-aware duration formatter
     toOrdinal.ts                    # ordinal number suffix (1st, 2nd…)
     discord-utils/
+      index.ts                      # barrel for @kyvrixon/utils/discord-utils
       Command.ts                    # DiscordCommand<C> class
       Event.ts                      # DiscordEvent<V, T, K> class
       createPagination.ts           # DiscordPagination class (Components V2 paginator)
     modules/
+      index.ts                      # barrel for @kyvrixon/utils/modules
       LoggerModule.ts               # chalk-based structured logger
 tests/
   formatSeconds.test.ts
@@ -76,14 +78,36 @@ declare module "@kyvrixon/utils" {
 ```
 
 ### `DiscordPagination`
-Discord **Components V2** paginator (`IsComponentsV2` flag). Renders a `ContainerBuilder`-based layout with Prev/Next/page-jump buttons. Collector expires after 60 seconds.
-- Construct with `new DiscordPagination(list, structure, options?)`, then call `.send(interaction)`
-- `structure` is an array of page layouts using sentinel values `DiscordPagination.DATA` (paginated entries) and `DiscordPagination.BUTTONS` (navigation row)
+Discord paginator supporting two modes via a `type` discriminant in options:
+
+**Container mode** (`type: "container"`) — Components V2 with `ContainerBuilder`:
+```ts
+new DiscordPagination(entries, {
+  type: "container",
+  layout: ["# Title", sep, DiscordPagination.DATA, sep, DiscordPagination.BUTTONS],
+  entriesPerPage: 5,
+  accentColor: 0x5865f2,
+});
+```
+
+**Embed mode** (`type: "embed"`) — standard `EmbedBuilder` with ActionRow buttons:
+```ts
+new DiscordPagination(entries, {
+  type: "embed",
+  embed: new EmbedBuilder().setTitle("Title").setColor(0x5865f2),
+  entriesPerPage: 5,
+});
+```
+
+- Construct with `new DiscordPagination(list, options)`, then call `.send(target)`
+- `target` accepts `ChatInputCommandInteraction`, `ButtonInteraction`, or `Message`
+- `layout` is a single flat array using sentinels `DiscordPagination.DATA` and `DiscordPagination.BUTTONS`
+- Embed mode: `description` and `footer` are reserved for page data and page counter
 - Uses `randomUUIDv7()` (Bun built-in) for unique button ID prefixes
-- `entriesPerPage`: default 5
-- `replacements`: key-value pairs replaced in rendered content
-- `styling`: per-page `accent_color`/`spoiler` overrides
-- `ephemeral`: whether the pagination message is ephemeral
+- Collector is message-scoped (not channel-wide) and expires after 60 seconds
+- Page-jump modal disabled for `Message` targets (modals require interaction context)
+- Shared options: `entriesPerPage` (default 5), `replacements`, `ephemeral`
+- Container-only options: `accentColor`, `spoiler`
 
 ### `LoggerModule`
 Chalk-based logger class with levels: `notif`, `alert`, `error`, `debug`.
@@ -121,6 +145,18 @@ bun run pub   # publishes src/ as-is (no compiled output)
 ```
 
 The package ships `src/` directly. Consumers must use Bun (or a bundler that handles `.ts` imports). Entry point and types both point to `./src/index.ts`.
+
+### Subpath Exports
+
+The package uses wildcard subpath exports — each folder under `src/lib/` with an `index.ts` barrel is automatically available as a subpath:
+
+```ts
+import { formatSeconds } from "@kyvrixon/utils";               // root
+import { DiscordCommand } from "@kyvrixon/utils/discord-utils"; // subpath
+import { LoggerModule } from "@kyvrixon/utils/modules";         // subpath
+```
+
+To add a new subpath, create a folder under `src/lib/` with an `index.ts` that re-exports its modules. No `package.json` changes needed — the `"./*"` wildcard export handles it dynamically.
 
 ## Renovate
 

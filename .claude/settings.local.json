@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(/c/Users/kyvrixon/.bun/bin/bun *)",
-      "Bash(bun test:*)"
+      "Bash(bun test:*)",
+      "Bash(where.exe bun:*)",
+      "Bash(cmd.exe /c \"where bun\")",
+      "Read(//c/Users/kyvrixon/Desktop/Projects/npm/utils/$HOME/.bun/bin/**)",
+      "Read(//c/Users/kyvrixon/.bun/bin/**)"
     ]
   }
 }

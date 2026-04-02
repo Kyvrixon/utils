@@ -1,4 +1,4 @@
-.claude/settings.local.json
+.claude
 
 # dependencies (bun install)
 node_modules

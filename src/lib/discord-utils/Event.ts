@@ -10,32 +10,29 @@ import type { Client, ClientEvents, RestEvents } from "discord.js";
  *   }
  * }
  */
-// biome-ignore lint/suspicious/noEmptyInterface: Its fine
+// biome-ignore lint/suspicious/noEmptyInterface: It's fine
 export interface DiscordEventCustomType {}
 
 /** Maps an event type discriminant to its corresponding event map. */
-type EventMap<T extends "client" | "rest" | "custom"> = T extends "client"
-	? ClientEvents
-	: T extends "rest"
-		? RestEvents
-		: keyof DiscordEventCustomType extends never
-			? { "sooo.. there's no custom events..": [] }
-			: DiscordEventCustomType;
+export type EventMap<T extends "client" | "rest" | "custom"> =
+	T extends "client"
+		? ClientEvents
+		: T extends "rest"
+			? RestEvents
+			: keyof DiscordEventCustomType extends never
+				? { "sooo.. there's no custom events..": [] }
+				: DiscordEventCustomType;
 
 /** Resolves the argument tuple for a given event type + key pair. */
-type EventArgs<
+export type EventArgs<
 	T extends "client" | "rest" | "custom",
 	K extends keyof EventMap<T>,
 > = Extract<EventMap<T>[K], any[]>;
 
 /**
  * Wraps a discord.js event handler. Supports `"client"`, `"rest"`, and `"custom"` event types.
- * @typeParam V - The bot's `Client` type.
- * @typeParam T - The event source discriminant.
- * @typeParam K - The event name within the chosen source.
  */
 export class DiscordEvent<
-	V extends Client,
 	T extends "client" | "rest" | "custom",
 	K extends keyof EventMap<T> = keyof EventMap<T>,
 > {
@@ -43,7 +40,7 @@ export class DiscordEvent<
 	public readonly name: K;
 	public readonly once: boolean;
 	public readonly method: (
-		client: V,
+		client: Client<true>,
 		...args: EventArgs<T, K>
 	) => void | Promise<void>;
 
@@ -51,7 +48,7 @@ export class DiscordEvent<
 		type: T;
 		name: K;
 		once: boolean;
-		method: DiscordEvent<V, T, K>["method"];
+		method: DiscordEvent<T, K>["method"];
 	}) {
 		this.type = opts.type;
 		this.name = opts.name;

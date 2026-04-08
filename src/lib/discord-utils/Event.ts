@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Its fine */
-import type { Client, ClientEvents, RestEvents } from "discord.js";
+import type {Client, ClientEvents, RestEvents} from "discord.js";
 
 /**
  * Augment this interface via module declaration to register custom event types.
@@ -11,48 +11,50 @@ import type { Client, ClientEvents, RestEvents } from "discord.js";
  * }
  */
 // biome-ignore lint/suspicious/noEmptyInterface: It's fine
-export interface DiscordEventCustomType {}
+export interface DiscordEventCustomType {
+}
 
 /** Maps an event type discriminant to its corresponding event map. */
 export type EventMap<T extends "client" | "rest" | "custom"> =
-	T extends "client"
-		? ClientEvents
-		: T extends "rest"
-			? RestEvents
-			: keyof DiscordEventCustomType extends never
-				? { "sooo.. there's no custom events..": [] }
-				: DiscordEventCustomType;
+    T extends "client"
+        ? ClientEvents
+        : T extends "rest"
+            ? RestEvents
+            : keyof DiscordEventCustomType extends never
+                ? { "sooo.. there's no custom events..": [] }
+                : DiscordEventCustomType;
 
 /** Resolves the argument tuple for a given event type + key pair. */
 export type EventArgs<
-	T extends "client" | "rest" | "custom",
-	K extends keyof EventMap<T>,
+    T extends "client" | "rest" | "custom",
+    K extends keyof EventMap<T>,
 > = Extract<EventMap<T>[K], any[]>;
 
 /**
  * Wraps a discord.js event handler. Supports `"client"`, `"rest"`, and `"custom"` event types.
  */
 export class DiscordEvent<
-	T extends "client" | "rest" | "custom",
-	K extends keyof EventMap<T> = keyof EventMap<T>,
+    C extends Client,
+    T extends "client" | "rest" | "custom",
+    K extends keyof EventMap<T> = keyof EventMap<T>,
 > {
-	public readonly type: T;
-	public readonly name: K;
-	public readonly once: boolean;
-	public readonly method: (
-		client: Client<true>,
-		...args: EventArgs<T, K>
-	) => void | Promise<void>;
+    public readonly type: T;
+    public readonly name: K;
+    public readonly once: boolean;
+    public readonly method: (
+        client: C,
+        ...args: EventArgs<T, K>
+    ) => void | Promise<void>;
 
-	constructor(opts: {
-		type: T;
-		name: K;
-		once: boolean;
-		method: DiscordEvent<T, K>["method"];
-	}) {
-		this.type = opts.type;
-		this.name = opts.name;
-		this.once = opts.once;
-		this.method = opts.method;
-	}
+    constructor(opts: {
+        type: T;
+        name: K;
+        once: boolean;
+        method: (client: C, ...args: EventArgs<T, K>) => void | Promise<void>;
+    }) {
+        this.type = opts.type;
+        this.name = opts.name;
+        this.once = opts.once;
+        this.method = opts.method;
+    }
 }

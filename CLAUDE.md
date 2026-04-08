@@ -62,7 +62,7 @@ Converts a number to its English ordinal string using `Intl.PluralRules`. Handle
 ### `DiscordCommand<C extends Client>`
 Class wrapping a discord.js slash command with `data`, `execute`, and optional `autocomplete` handlers. Generic over the bot's client type.
 
-### `DiscordEvent<V, T, K>`
+### `DiscordEvent<C, T, K>`
 Class wrapping a discord.js event handler. Supports three event types:
 - `"client"` — standard `ClientEvents`
 - `"rest"` — `RestEvents`

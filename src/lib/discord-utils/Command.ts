@@ -7,7 +7,10 @@ import type {
 	SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
-export type CommandData = SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
+export type CommandData =
+	| SlashCommandBuilder
+	| SlashCommandOptionsOnlyBuilder
+	| SlashCommandSubcommandsOnlyBuilder;
 
 export interface DiscordCommandMetadata extends Record<string, unknown> {}
 
@@ -23,7 +26,7 @@ export interface DiscordCommandMetadata extends Record<string, unknown> {}
  *     }
  * }
  */
-export class DiscordCommand<C extends Client> {
+export class DiscordCommand<C extends Client = Client> {
 	public readonly data: CommandData;
 	public readonly execute: (
 		client: C,
@@ -38,8 +41,14 @@ export class DiscordCommand<C extends Client> {
 	constructor(ops: {
 		data: CommandData;
 		metadata: DiscordCommandMetadata;
-		execute: (client: C, interaction: ChatInputCommandInteraction) => Promise<void>;
-		autocomplete?: (client: C, interaction: AutocompleteInteraction) => Promise<void>;
+		execute: (
+			client: C,
+			interaction: ChatInputCommandInteraction,
+		) => Promise<void>;
+		autocomplete?: (
+			client: C,
+			interaction: AutocompleteInteraction,
+		) => Promise<void>;
 	}) {
 		this.data = ops.data;
 		this.metadata = ops.metadata;

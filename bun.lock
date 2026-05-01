@@ -13,7 +13,7 @@
         "typescript": "^6.0.2",
       },
       "peerDependencies": {
-        "discord.js": "^14.26.2",
+        "discord.js": "^14.26.4",
       },
     },
   },

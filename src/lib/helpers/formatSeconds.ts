@@ -14,7 +14,7 @@ const UNITS: Record<
 	ms: { label: "millisecond", short: "ms", ms: 1 },
 };
 
-const ALL_UNITS_ORDER: Array<TimeUnitTypes> = [
+const ALL_UNITS_ORDER: TimeUnitTypes[] = [
 	"y",
 	"mo",
 	"w",
@@ -39,8 +39,9 @@ export function formatSeconds(
 	seconds: number,
 	options: {
 		includeZeroUnits?: boolean;
-		onlyUnits?: Array<TimeUnitTypes>;
+		onlyUnits?: TimeUnitTypes[];
 		format?: "long" | "short";
+		rounding?: "floor" | "ceil" | "round";
 		customFormatter?: (
 			unit: TimeUnitTypes,
 			value: number,
@@ -52,15 +53,23 @@ export function formatSeconds(
 		includeZeroUnits = false,
 		onlyUnits = [],
 		format = "long",
+		rounding = "round",
 		customFormatter,
 	} = options;
 
 	if (!Number.isFinite(seconds)) return format === "short" ? "0s" : "0 seconds";
 
-	let totalMs = Math.max(0, Math.round(seconds * 1000));
+	const isNegative = seconds < 0;
+	const absSeconds = Math.abs(seconds);
+
 	const unitsToDisplay = onlyUnits.length
 		? ALL_UNITS_ORDER.filter((u) => onlyUnits.includes(u))
 		: ALL_UNITS_ORDER;
+
+	const lastUnit = unitsToDisplay[unitsToDisplay.length - 1] ?? "s";
+
+	// If we are rounding to a unit larger than ms, we should do it at that level
+	let totalMs = Math.round(absSeconds * 1000);
 
 	const diff: Partial<Record<TimeUnitTypes, number>> = {};
 	const now = new Date();
@@ -71,12 +80,19 @@ export function formatSeconds(
 		const afterYears = new Date(now);
 		afterYears.setFullYear(now.getFullYear() + y);
 		if (afterYears > end) y--;
-		diff.y = Math.max(0, y);
-		totalMs -=
-			new Date(now).setFullYear(now.getFullYear() + diff.y) - now.getTime();
+
+		if (lastUnit === "y") {
+			const totalY = absSeconds / (UNITS.y.ms / 1000);
+			diff.y = Math.max(0, Math[rounding](totalY));
+			totalMs = 0;
+		} else {
+			diff.y = Math.max(0, y);
+			totalMs -=
+				new Date(now).setFullYear(now.getFullYear() + diff.y) - now.getTime();
+		}
 	}
 
-	if (unitsToDisplay.includes("mo")) {
+	if (totalMs > 0 && unitsToDisplay.includes("mo")) {
 		const startTotalMonths = now.getFullYear() * 12 + now.getMonth();
 		const endTotalMonths = end.getFullYear() * 12 + end.getMonth();
 		let mo = endTotalMonths - startTotalMonths;
@@ -87,17 +103,30 @@ export function formatSeconds(
 		afterYearsAndMonths.setMonth(now.getMonth() + mo);
 		if (afterYearsAndMonths > end) mo--;
 
-		diff.mo = Math.max(0, mo);
-		const jumpDate = new Date(now);
-		jumpDate.setFullYear(now.getFullYear() + (diff.y ?? 0));
-		jumpDate.setMonth(now.getMonth() + diff.mo);
-		totalMs = end.getTime() - jumpDate.getTime();
+		if (lastUnit === "mo") {
+			const totalMo =
+				(absSeconds - (diff.y ?? 0) * (UNITS.y.ms / 1000)) /
+				(UNITS.mo.ms / 1000);
+			diff.mo = Math.max(0, Math[rounding](totalMo));
+			totalMs = 0;
+		} else {
+			diff.mo = Math.max(0, mo);
+			const jumpDate = new Date(now);
+			jumpDate.setFullYear(now.getFullYear() + (diff.y ?? 0));
+			jumpDate.setMonth(now.getMonth() + diff.mo);
+			totalMs = end.getTime() - jumpDate.getTime();
+		}
 	}
 
 	for (const unit of ["w", "d", "h", "m", "s", "ms"] as const) {
 		if (unitsToDisplay.includes(unit)) {
-			diff[unit] = Math.floor(totalMs / UNITS[unit].ms);
-			totalMs %= UNITS[unit].ms;
+			if (unit === lastUnit) {
+				diff[unit] = Math[rounding](totalMs / UNITS[unit].ms);
+				totalMs = 0;
+			} else {
+				diff[unit] = Math.floor(totalMs / UNITS[unit].ms);
+				totalMs %= UNITS[unit].ms;
+			}
 		}
 	}
 
@@ -122,10 +151,26 @@ export function formatSeconds(
 		}
 	}
 
-	if (parts.length === 0) return format === "short" ? "0s" : "0 seconds";
-	if (format === "long" && parts.length > 1) {
-		const last = parts.pop();
-		return `${parts.join(", ")} and ${last}`;
+	if (parts.length === 0) {
+		const zero = format === "short" ? "0s" : "0 seconds";
+		return isNegative ? `-${zero}` : zero;
 	}
-	return parts.join(format === "short" ? " " : ", ");
+
+	let result: string;
+	if (format === "long" && parts.length > 1) {
+		try {
+			const formatter = new Intl.ListFormat("en-US", {
+				style: "long",
+				type: "conjunction",
+			});
+			result = formatter.format(parts);
+		} catch {
+			const last = parts.pop();
+			result = `${parts.join(", ")} and ${last}`;
+		}
+	} else {
+		result = parts.join(format === "short" ? " " : ", ");
+	}
+
+	return isNegative ? `-${result}` : result;
 }

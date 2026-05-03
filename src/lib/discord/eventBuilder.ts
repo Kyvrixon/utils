@@ -4,7 +4,7 @@ import type { Client, ClientEvents, RestEvents } from "discord.js";
 /**
  * Augment this interface via module declaration to register custom event types.
  * @example
- * declare module "@kyvrixon/utils" {
+ * declare module "@kyvrixon/utils/discord" {
  *   interface DiscordEventCustomType {
  *     myEvent: [data: string];
  *   }
@@ -32,7 +32,7 @@ export type EventArgs<
 /**
  * Wraps a discord.js event handler. Supports `"client"`, `"rest"`, and `"custom"` event types.
  */
-export class DiscordEvent<
+export class EventBuilder<
 	T extends "client" | "rest" | "custom",
 	K extends keyof EventMap<T> = keyof EventMap<T>,
 	C extends Client = Client,

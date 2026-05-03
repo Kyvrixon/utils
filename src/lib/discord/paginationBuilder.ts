@@ -26,7 +26,7 @@ import {
 } from "discord.js";
 
 /** An action row containing any interactive message component. */
-export type MessageActionRow = ActionRowBuilder<
+export type PaginationMessageActionRow = ActionRowBuilder<
 	| ButtonBuilder
 	| StringSelectMenuBuilder
 	| UserSelectMenuBuilder
@@ -46,11 +46,11 @@ export type PaginationInput =
 	| SeparatorBuilder
 	| FileBuilder
 	| MediaGalleryBuilder
-	| MessageActionRow
+	| PaginationMessageActionRow
 	| typeof BUTTONS_SYMBOL
 	| typeof DATA_SYMBOL;
 
-type InternalComponent =
+export type PaginationInternalComponent =
 	| { type: "buttons" }
 	| { type: "data" }
 	| { type: "display"; component: TextDisplayBuilder }
@@ -58,7 +58,21 @@ type InternalComponent =
 	| { type: "separator"; component: SeparatorBuilder }
 	| { type: "file"; component: FileBuilder }
 	| { type: "gallery"; component: MediaGalleryBuilder }
-	| { type: "actionrow"; component: MessageActionRow };
+	| { type: "actionrow"; component: PaginationMessageActionRow };
+
+export interface PaginationButtonConfig {
+	label?: string;
+	emoji?: string;
+	style?: ButtonStyle;
+}
+
+export interface PaginationButtonOptions {
+	first?: PaginationButtonConfig;
+	back?: PaginationButtonConfig;
+	next?: PaginationButtonConfig;
+	last?: PaginationButtonConfig;
+	jump?: PaginationButtonConfig;
+}
 
 /** Shared options for all pagination modes. */
 export interface PaginationBaseOptions {
@@ -68,6 +82,16 @@ export interface PaginationBaseOptions {
 	replacements?: Record<string, string>;
 	/** Whether the pagination message is ephemeral. */
 	ephemeral?: boolean;
+	/** Idle timeout in milliseconds (default: 60,000). */
+	idleTimeout?: number;
+	/** Custom button labels/emojis/styles. */
+	buttons?: PaginationButtonOptions;
+	/** Whether to show "First" and "Last" buttons. */
+	showSkipButtons?: boolean;
+	/** Callback when the collector ends. */
+	onEnd?: (
+		interaction?: ButtonInteraction | ChatInputCommandInteraction,
+	) => void | Promise<void>;
 }
 
 /**
@@ -77,7 +101,7 @@ export interface PaginationBaseOptions {
 export interface PaginationContainerOptions extends PaginationBaseOptions {
 	/** Selects container mode. */
 	type: "container";
-	/** Single layout template using sentinels `DiscordPagination.DATA` and `DiscordPagination.BUTTONS`. */
+	/** Single layout template using sentinels `PaginationBuilder.DATA` and `PaginationBuilder.BUTTONS`. */
 	layout: PaginationInput[];
 	/** Container accent color. */
 	accentColor?: number;
@@ -108,14 +132,14 @@ export type PaginationOptions =
  *
  * @example Container mode
  * ```ts
- * const pagination = new DiscordPagination(entries, {
+ * const pagination = new PaginationBuilder(entries, {
  *     type: "container",
  *     layout: [
  *         "# Leaderboard",
  *         new SeparatorBuilder(),
- *         DiscordPagination.DATA,
+ *         PaginationBuilder.DATA,
  *         new SeparatorBuilder(),
- *         DiscordPagination.BUTTONS,
+ *         PaginationBuilder.BUTTONS,
  *     ],
  *     entriesPerPage: 5,
  *     accentColor: 0x5865f2,
@@ -124,17 +148,17 @@ export type PaginationOptions =
  *
  * @example Embed mode
  * ```ts
- * const pagination = new DiscordPagination(entries, {
+ * const pagination = new PaginationBuilder(entries, {
  *     type: "embed",
  *     embed: new EmbedBuilder().setTitle("Leaderboard").setColor(0x5865f2),
  *     entriesPerPage: 5,
  * });
  * ```
  */
-export class DiscordPagination {
-	/** Sentinel — marks where the pagination buttons should render. */
+export class PaginationBuilder {
+	/** Marks where the pagination buttons should render. */
 	static readonly BUTTONS: typeof BUTTONS_SYMBOL = BUTTONS_SYMBOL;
-	/** Sentinel — marks where the paginated list entries should render. */
+	/** Marks where the paginated list entries should render. */
 	static readonly DATA: typeof DATA_SYMBOL = DATA_SYMBOL;
 
 	private readonly list: string[];
@@ -144,9 +168,15 @@ export class DiscordPagination {
 	private readonly prefix: string;
 	private readonly totalPages: number;
 	private readonly mode: "container" | "embed";
+	private readonly idleTimeout: number;
+	private readonly buttonOptions?: PaginationButtonOptions;
+	private readonly showSkipButtons: boolean;
+	private readonly onEnd?: (
+		interaction?: ButtonInteraction | ChatInputCommandInteraction,
+	) => void | Promise<void>;
 
 	// Container mode
-	private readonly layout?: InternalComponent[];
+	private readonly layout?: PaginationInternalComponent[];
 	private readonly accentColor?: number;
 	private readonly spoiler?: boolean;
 
@@ -161,7 +191,15 @@ export class DiscordPagination {
 	private replyMessage?: Message;
 
 	constructor(list: string[], options: PaginationOptions) {
-		const { entriesPerPage = 5, replacements, ephemeral = false } = options;
+		const {
+			entriesPerPage = 5,
+			replacements,
+			ephemeral = false,
+			idleTimeout = 60_000,
+			buttons,
+			showSkipButtons = false,
+			onEnd,
+		} = options;
 
 		if (entriesPerPage <= 0)
 			throw new Error("entriesPerPage must be greater than 0");
@@ -170,6 +208,10 @@ export class DiscordPagination {
 		this.entriesPerPage = entriesPerPage;
 		this.replacements = replacements;
 		this.ephemeral = ephemeral;
+		this.idleTimeout = idleTimeout;
+		this.buttonOptions = buttons;
+		this.showSkipButtons = showSkipButtons;
+		this.onEnd = onEnd;
 		this.prefix = `~PAGINATION_${randomUUIDv7()}_`;
 		this.totalPages = Math.ceil(list.length / entriesPerPage);
 
@@ -232,7 +274,7 @@ export class DiscordPagination {
 
 		const collector = this.replyMessage.createMessageComponentCollector({
 			componentType: ComponentType.Button,
-			time: 60_000,
+			time: this.idleTimeout,
 		});
 
 		collector.on("collect", async (btn) => {
@@ -246,6 +288,10 @@ export class DiscordPagination {
 
 			if (btn.customId === `${this.prefix}info`) {
 				await this.handlePageJump(btn);
+			} else if (btn.customId === `${this.prefix}first`) {
+				this.currentIndex = 0;
+			} else if (btn.customId === `${this.prefix}last`) {
+				this.currentIndex = (this.totalPages - 1) * this.entriesPerPage;
 			} else {
 				this.currentIndex +=
 					btn.customId === `${this.prefix}back`
@@ -258,6 +304,9 @@ export class DiscordPagination {
 						(this.totalPages - 1) * this.entriesPerPage,
 					),
 				);
+			}
+
+			if (btn.customId !== `${this.prefix}info`) {
 				await btn.deferUpdate().catch(() => {});
 			}
 
@@ -267,6 +316,7 @@ export class DiscordPagination {
 		collector.on("end", async () => {
 			this.ended = true;
 			await this.render();
+			if (this.onEnd) await this.onEnd(this.interaction);
 		});
 	}
 
@@ -330,7 +380,7 @@ export class DiscordPagination {
 		}
 	}
 
-	private normalize(input: PaginationInput): InternalComponent {
+	private normalize(input: PaginationInput): PaginationInternalComponent {
 		if (input === BUTTONS_SYMBOL) return { type: "buttons" };
 		if (input === DATA_SYMBOL) return { type: "data" };
 		if (typeof input === "string")
@@ -418,34 +468,72 @@ export class DiscordPagination {
 	}
 
 	private getPaginationRow(): ActionRowBuilder<ButtonBuilder> {
-		return new ActionRowBuilder<ButtonBuilder>().addComponents(
-			new ButtonBuilder()
-				.setCustomId(`${this.prefix}back`)
-				.setLabel("Prev")
-				.setStyle(ButtonStyle.Secondary)
-				.setDisabled(this.ended || this.currentIndex === 0),
-			new ButtonBuilder()
-				.setCustomId(`${this.prefix}info`)
-				.setLabel(
+		const row = new ActionRowBuilder<ButtonBuilder>();
+
+		if (this.showSkipButtons) {
+			const firstBtn = new ButtonBuilder()
+				.setCustomId(`${this.prefix}first`)
+				.setLabel(this.buttonOptions?.first?.label ?? "<<")
+				.setStyle(this.buttonOptions?.first?.style ?? ButtonStyle.Secondary)
+				.setDisabled(this.ended || this.currentIndex === 0);
+			if (this.buttonOptions?.first?.emoji)
+				firstBtn.setEmoji(this.buttonOptions.first.emoji);
+			row.addComponents(firstBtn);
+		}
+
+		const backBtn = new ButtonBuilder()
+			.setCustomId(`${this.prefix}back`)
+			.setLabel(this.buttonOptions?.back?.label ?? "<")
+			.setStyle(this.buttonOptions?.back?.style ?? ButtonStyle.Secondary)
+			.setDisabled(this.ended || this.currentIndex === 0);
+		if (this.buttonOptions?.back?.emoji)
+			backBtn.setEmoji(this.buttonOptions.back.emoji);
+
+		const infoBtn = new ButtonBuilder()
+			.setCustomId(`${this.prefix}info`)
+			.setLabel(
+				this.buttonOptions?.jump?.label ??
 					`${Math.floor(this.currentIndex / this.entriesPerPage) + 1}/${this.totalPages}`,
-				)
-				.setStyle(ButtonStyle.Secondary)
-				.setDisabled(this.ended || this.totalPages === 1 || this.isMessage),
-			new ButtonBuilder()
-				.setCustomId(`${this.prefix}forward`)
-				.setLabel("Next")
-				.setStyle(ButtonStyle.Secondary)
+			)
+			.setStyle(this.buttonOptions?.jump?.style ?? ButtonStyle.Secondary)
+			.setDisabled(this.ended || this.totalPages === 1);
+		if (this.buttonOptions?.jump?.emoji)
+			infoBtn.setEmoji(this.buttonOptions.jump.emoji);
+
+		const nextBtn = new ButtonBuilder()
+			.setCustomId(`${this.prefix}forward`)
+			.setLabel(this.buttonOptions?.next?.label ?? ">")
+			.setStyle(this.buttonOptions?.next?.style ?? ButtonStyle.Secondary)
+			.setDisabled(
+				this.ended ||
+					this.currentIndex + this.entriesPerPage >= this.list.length,
+			);
+		if (this.buttonOptions?.next?.emoji)
+			nextBtn.setEmoji(this.buttonOptions.next.emoji);
+
+		row.addComponents(backBtn, infoBtn, nextBtn);
+
+		if (this.showSkipButtons) {
+			const lastBtn = new ButtonBuilder()
+				.setCustomId(`${this.prefix}last`)
+				.setLabel(this.buttonOptions?.last?.label ?? ">>")
+				.setStyle(this.buttonOptions?.last?.style ?? ButtonStyle.Secondary)
 				.setDisabled(
 					this.ended ||
 						this.currentIndex + this.entriesPerPage >= this.list.length,
-				),
-		);
+				);
+			if (this.buttonOptions?.last?.emoji)
+				lastBtn.setEmoji(this.buttonOptions.last.emoji);
+			row.addComponents(lastBtn);
+		}
+
+		return row;
 	}
 
 	private async handlePageJump(btn: ButtonInteraction): Promise<void> {
 		const modal = new ModalBuilder()
 			.setCustomId(`${this.prefix}modal`)
-			.setTitle("Page Indexer")
+			.setTitle("Jump to page")
 			.addLabelComponents(
 				new LabelBuilder()
 					.setLabel("Input a page number")
@@ -460,18 +548,13 @@ export class DiscordPagination {
 
 		await btn.showModal(modal).catch((e) => console.error(e));
 		const modalSubmit = await btn
-			.awaitModalSubmit({ time: 60_000 })
+			.awaitModalSubmit({
+				filter: (i) => i.customId === `${this.prefix}modal`,
+				time: 60_000,
+			})
 			.catch(() => null);
 
-		if (!modalSubmit) {
-			await btn
-				.followUp({
-					content: "Modal timed out.",
-					flags: ["Ephemeral"],
-				})
-				.catch(() => null);
-			return;
-		}
+		if (!modalSubmit) return;
 
 		const pageNumber = Number(
 			modalSubmit.fields.getTextInputValue(`${this.prefix}number`),

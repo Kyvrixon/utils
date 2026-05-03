@@ -105,7 +105,6 @@ new DiscordPagination(entries, {
 - Embed mode: `description` and `footer` are reserved for page data and page counter
 - Uses `randomUUIDv7()` (Bun built-in) for unique button ID prefixes
 - Collector is message-scoped (not channel-wide) and expires after 60 seconds
-- Page-jump modal disabled for `Message` targets (modals require interaction context)
 - Shared options: `entriesPerPage` (default 5), `replacements`, `ephemeral`
 - Container-only options: `accentColor`, `spoiler`
 

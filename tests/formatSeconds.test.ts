@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatSeconds } from "../src";
 
-describe(() => {
+describe("main", () => {
 	describe("long format (default)", () => {
 		test("single unit", () => {
 			expect(formatSeconds(60)).toBe("1 minute");
@@ -15,12 +15,9 @@ describe(() => {
 			expect(formatSeconds(172800)).toBe("2 days");
 		});
 
-		test("joins two parts with 'and'", () => {
-			expect(formatSeconds(3661)).toBe("1 hour, 1 minute and 1 second");
-		});
-
-		test("joins multiple parts with commas and trailing 'and'", () => {
-			expect(formatSeconds(90061)).toBe("1 day, 1 hour, 1 minute and 1 second");
+		test("joins multiple parts with commas and trailing 'and' (Oxford comma)", () => {
+			expect(formatSeconds(3661)).toBe("1 hour, 1 minute, and 1 second");
+			expect(formatSeconds(90061)).toBe("1 day, 1 hour, 1 minute, and 1 second");
 		});
 	});
 
@@ -44,9 +41,9 @@ describe(() => {
 			expect(formatSeconds(0, { format: "short" })).toBe("0s");
 		});
 
-		test("negative input clamps to zero", () => {
-			expect(formatSeconds(-100)).toBe("0 seconds");
-			expect(formatSeconds(-100, { format: "short" })).toBe("0s");
+		test("negative input now supported", () => {
+			expect(formatSeconds(-100)).toBe("-1 minute and 40 seconds");
+			expect(formatSeconds(-100, { format: "short" })).toBe("-1m 40s");
 		});
 
 		test("NaN returns zero fallback", () => {
@@ -57,6 +54,22 @@ describe(() => {
 		test("Infinity returns zero fallback", () => {
 			expect(formatSeconds(Infinity)).toBe("0 seconds");
 			expect(formatSeconds(-Infinity, { format: "short" })).toBe("0s");
+		});
+	});
+
+	describe("rounding options", () => {
+		test("floor", () => {
+			expect(formatSeconds(1.9, { rounding: "floor" })).toBe("1 second and 900 milliseconds");
+			expect(formatSeconds(1.999, { rounding: "floor", onlyUnits: ["s"] })).toBe("1 second");
+		});
+
+		test("ceil", () => {
+			expect(formatSeconds(1.1, { rounding: "ceil", onlyUnits: ["s"] })).toBe("2 seconds");
+		});
+
+		test("round (default)", () => {
+			expect(formatSeconds(1.5, { rounding: "round", onlyUnits: ["s"] })).toBe("2 seconds");
+			expect(formatSeconds(1.4, { rounding: "round", onlyUnits: ["s"] })).toBe("1 second");
 		});
 	});
 
@@ -93,13 +106,13 @@ describe(() => {
 	});
 
 	describe("includeZeroUnits", () => {
-		test("shows zero-valued units when true", () => {
+		test("shows zero-valued units when true (with Oxford comma)", () => {
 			expect(
 				formatSeconds(3600, {
 					includeZeroUnits: true,
 					onlyUnits: ["d", "h", "m", "s"],
 				}),
-			).toBe("0 days, 1 hour, 0 minutes and 0 seconds");
+			).toBe("0 days, 1 hour, 0 minutes, and 0 seconds");
 		});
 
 		test("hides zero-valued units when false (default)", () => {

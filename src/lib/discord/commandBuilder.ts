@@ -2,17 +2,27 @@ import type {
 	AutocompleteInteraction,
 	ChatInputCommandInteraction,
 	Client,
+	ContextMenuCommandBuilder,
+	ContextMenuCommandInteraction,
 	SlashCommandBuilder,
 	SlashCommandOptionsOnlyBuilder,
 	SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
-export type CommandData = SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
+export type CommandData =
+	| SlashCommandBuilder
+	| SlashCommandOptionsOnlyBuilder
+	| SlashCommandSubcommandsOnlyBuilder
+	| ContextMenuCommandBuilder;
+
+export type DiscordCommandInteraction =
+	| ChatInputCommandInteraction
+	| ContextMenuCommandInteraction;
 
 export interface DiscordCommandMetadata extends Record<string, unknown> {}
 
 /**
- * Wraps a discord.js slash command with typed `execute` and optional `autocomplete` handlers.
+ * Wraps a discord.js slash or context menu command with typed `execute` and optional `autocomplete` handlers.
  * @typeParam C - The bot's `Client` type. Inferred from args[0] in `method`.
  *
  * @example To extend the `metadata` types
@@ -23,11 +33,11 @@ export interface DiscordCommandMetadata extends Record<string, unknown> {}
  *     }
  * }
  */
-export class DiscordCommand<C extends Client> {
+export class DiscordCommand<C extends Client = Client> {
 	public readonly data: CommandData;
 	public readonly execute: (
 		client: C,
-		interaction: ChatInputCommandInteraction,
+		interaction: DiscordCommandInteraction,
 	) => Promise<void>;
 	public readonly autocomplete?: (
 		client: C,
@@ -38,8 +48,14 @@ export class DiscordCommand<C extends Client> {
 	constructor(ops: {
 		data: CommandData;
 		metadata: DiscordCommandMetadata;
-		execute: (client: C, interaction: ChatInputCommandInteraction) => Promise<void>;
-		autocomplete?: (client: C, interaction: AutocompleteInteraction) => Promise<void>;
+		execute: (
+			client: C,
+			interaction: DiscordCommandInteraction,
+		) => Promise<void>;
+		autocomplete?: (
+			client: C,
+			interaction: AutocompleteInteraction,
+		) => Promise<void>;
 	}) {
 		this.data = ops.data;
 		this.metadata = ops.metadata;

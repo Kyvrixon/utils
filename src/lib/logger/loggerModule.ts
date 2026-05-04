@@ -4,6 +4,11 @@ import chalk from "chalk";
 export type LogLevel = "NOTIF" | "ALERT" | "ERROR" | "DEBUG";
 const { cyan, yellow, red, magenta, dim, gray, bold } = chalk;
 
+interface LogMethod {
+	(message: unknown, raw: true): string;
+	(message: unknown, raw?: false): void;
+}
+
 export interface LoggerOptions {
 	name: string;
 	timeformat?: Intl.LocalesArgument;
@@ -132,30 +137,24 @@ export class LoggerModule {
 		console.log(`\n${left} ${bold(trimmed)} ${right}`);
 	}
 
-	public log(
-		level: LogLevel,
-		message: unknown,
-		raw = false,
-	): string | undefined {
+	private log(level: LogLevel, message: unknown, raw: boolean): string | undefined {
 		if (this.levelPriority[level] < this.levelPriority[this.level]) return;
-
 		const msg = this.formatMessage(level, message);
 		if (raw) {
 			return msg instanceof Error ? msg.stack || msg.message : msg;
 		}
-		console[this.logMethods[level]](msg);
+		void console[this.logMethods[level]](msg);
 	}
 
-	public notif(message: unknown, raw = false) {
-		return this.log("NOTIF", message, raw);
-	}
-	public alert(message: unknown, raw = false) {
-		return this.log("ALERT", message, raw);
-	}
-	public error(message: unknown, raw = false) {
-		return this.log("ERROR", message, raw);
-	}
-	public debug(message: unknown, raw = false) {
-		return this.log("DEBUG", message, raw);
-	}
+	public notif: LogMethod = (message: unknown, raw?: boolean) =>
+		this.log("NOTIF", message, raw ?? false) as string & undefined;
+
+	public alert: LogMethod = (message: unknown, raw?: boolean) =>
+		this.log("ALERT", message, raw ?? false) as string & undefined;
+
+	public error: LogMethod = (message: unknown, raw?: boolean) =>
+		this.log("ERROR", message, raw ?? false) as string & undefined;
+
+	public debug: LogMethod = (message: unknown, raw?: boolean) =>
+		this.log("DEBUG", message, raw ?? false) as string & undefined;
 }

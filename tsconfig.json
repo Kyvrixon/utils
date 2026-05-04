@@ -26,5 +26,5 @@
 		"noUnusedParameters": true,
 		"noPropertyAccessFromIndexSignature": true
 	},
-	"include": ["src/**/*", "tests/**/*", "main.ts", "@types/**/*"]
+	"include": ["src/**/*", "tests/**/*", "@types/**/*"]
 }
